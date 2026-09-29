@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>Resultados encuesta</title><link rel="stylesheet" href="estilo.css"></head>
+<body><main>
+<header><h1>Resultados de la encuesta</h1><p>Solo para el docente. Se actualiza cada 15 segundos.</p></header>
+<form id="login" class="row" style="margin:16px 0"><input type="password" id="k" placeholder="Clave de administrador" autocomplete="current-password"><button>Ver</button></form>
+<p class="err" id="err"></p>
+<div id="out"></div>
+</main>
+<script src="preguntas.js"></script>
+<script>
+const out = document.getElementById("out"), errEl = document.getElementById("err"), kIn = document.getElementById("k");
+let key = ""; try { key = sessionStorage.getItem("ek") || ""; } catch(e){}
+let data = null, timer = null;
+function esc(s){ const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+async function cargar(){
+  try {
+    const r = await fetch(API + "/results", { headers: { "X-Admin-Key": key } });
+    if (r.status === 401) { errEl.textContent = "Clave incorrecta."; clearInterval(timer); return; }
+    data = await r.json(); errEl.textContent = ""; try { sessionStorage.setItem("ek", key); } catch(e){}
+    pintar();
+  } catch(x) { errEl.textContent = "No se pudo conectar con el servidor."; }
+}
+function pintar(){
+  const n = data.votos;
+  let h = `<div class="kpi"><div><b>${n}</b>votos</div><div><b>${data.ultimo ? new Date(data.ultimo*1000).toLocaleTimeString("es-PE") : "–"}</b>último voto</div></div>`;
+  h += `<div class="row" style="margin-bottom:8px"><button id="csv" type="button">Descargar CSV</button></div>`;
+  for (const p of PREGUNTAS) {
+    h += `<fieldset><legend>${esc(p.texto)}</legend>`;
+    if (p.tipo === "texto") {
+      const t = (data.textos[p.id] || []);
+      h += t.length ? `<ul class="textos">${t.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : "<p>Sin respuestas aún.</p>";
+    } else {
+      const tot = data.totales[p.id] || {};
+      const filas = p.opciones.map(o => [o, tot[o] || 0]).sort((a,b) => b[1]-a[1]);
+      const max = Math.max(1, ...filas.map(f => f[1]));
+      h += `<table><thead><tr><th>Opción</th><th></th><th class="n">Votos</th><th class="n">%</th></tr></thead><tbody>`;
+      for (const [o, v] of filas) h += `<tr><td>${esc(o)}</td><td style="width:35%"><div class="bar" style="width:${v/max*100}%"></div></td><td class="n">${v}</td><td class="n">${n ? Math.round(v/n*100) : 0}%</td></tr>`;
+      h += `</tbody></table>`;
+      if (p.tipo === "varias") h += `<p style="color:var(--muted);font-size:.85rem">Selección múltiple: el % es sobre el total de votantes.</p>`;
+    }
+    h += `</fieldset>`;
+  }
+  out.innerHTML = h;
+  document.getElementById("csv").onclick = csv;
+}
+function csv(){
+  const L = [["pregunta","opcion","votos"]];
+  for (const p of PREGUNTAS) {
+    if (p.tipo === "texto") (data.textos[p.id]||[]).forEach(t => L.push([p.texto, t, ""]));
+    else p.opciones.forEach(o => L.push([p.texto, o, (data.totales[p.id]||{})[o]||0]));
+  }
+  const s = L.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(",")).join("\n");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["﻿"+s], {type:"text/csv"})); a.download = "encuesta-ia.csv"; a.click();
+}
+document.getElementById("login").addEventListener("submit", e => { e.preventDefault(); key = kIn.value.trim(); cargar(); clearInterval(timer); timer = setInterval(cargar, 15000); });
+if (key) { cargar(); timer = setInterval(cargar, 15000); }
+</script></body></html>

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Encuesta IA</title><link rel="stylesheet" href="estilo.css"></head>
+<body><main>
+<header><h1>¿Cómo usas la IA hoy?</h1><p>AI Productivity Engineering · eIA · Encuesta anónima de 3 minutos. Un solo voto por persona.</p></header>
+<div id="estado"></div>
+<form id="f"></form>
+</main>
+<script src="preguntas.js"></script>
+<script>
+const f = document.getElementById("f"), estado = document.getElementById("estado");
+const K = "encuesta-ia-s1";
+function get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+function set(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
+function yaVoto(){ estado.innerHTML = '<div class="msg"><b>¡Gracias!</b> Tu voto quedó registrado. Veremos los resultados juntos en la próxima clase.</div>'; f.remove(); }
+if (get(K + ":votado")) { yaVoto(); }
+let token = get(K + ":token");
+if (!token) { token = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()); set(K + ":token", token); }
+for (const p of PREGUNTAS) {
+  const fs = document.createElement("fieldset"); const lg = document.createElement("legend"); lg.textContent = p.texto; fs.appendChild(lg);
+  if (p.tipo === "texto") { const t = document.createElement("textarea"); t.name = p.id; t.maxLength = 1000; fs.appendChild(t); }
+  else for (const o of p.opciones) {
+    const l = document.createElement("label"); l.className = "op";
+    const i = document.createElement("input"); i.type = p.tipo === "una" ? "radio" : "checkbox"; i.name = p.id; i.value = o;
+    if (p.max) i.addEventListener("change", () => { const c = f.querySelectorAll(`input[name=${p.id}]:checked`); if (c.length > p.max) i.checked = false; });
+    l.append(i, document.createTextNode(o)); fs.appendChild(l);
+  }
+  f.appendChild(fs);
+}
+const b = document.createElement("button"); b.type = "submit"; b.textContent = "Enviar mi voto"; f.appendChild(b);
+const err = document.createElement("p"); err.className = "err"; f.appendChild(err);
+f.addEventListener("submit", async (e) => {
+  e.preventDefault(); err.textContent = "";
+  const answers = {};
+  for (const p of PREGUNTAS) {
+    if (p.tipo === "texto") answers[p.id] = f.elements[p.id].value.trim();
+    else if (p.tipo === "una") { const c = f.querySelector(`input[name=${p.id}]:checked`); answers[p.id] = c ? c.value : ""; }
+    else answers[p.id] = [...f.querySelectorAll(`input[name=${p.id}]:checked`)].map(x => x.value);
+  }
+  const falta = PREGUNTAS.find(p => !p.opcional && (Array.isArray(answers[p.id]) ? !answers[p.id].length : !answers[p.id]));
+  if (falta) { err.textContent = "Falta responder: " + falta.texto; return; }
+  b.disabled = true; b.textContent = "Enviando...";
+  try {
+    const r = await fetch(API + "/vote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, answers }) });
+    if (r.status === 201 || r.status === 409) { set(K + ":votado", "1"); yaVoto(); return; }
+    const j = await r.json().catch(() => ({})); throw new Error(j.error || ("error " + r.status));
+  } catch (x) { err.textContent = "No se pudo enviar: " + x.message + ". Intenta de nuevo."; b.disabled = false; b.textContent = "Enviar mi voto"; }
+});
+</script></body></html>
