@@ -2,12 +2,14 @@
 
 Encuesta anónima para la sesión 1 del curso. Sirve para ajustar las clases siguientes según cómo usan la IA los participantes.
 
-- **Votar:** https://unimauro.github.io/encuesta-ia/
+- **Encuesta inicial:** https://unimauro.github.io/encuesta-ia/
+- **Encuesta de cierre:** https://unimauro.github.io/encuesta-ia/cierre.html
 - **Resultados (solo docente, con clave):** https://unimauro.github.io/encuesta-ia/resultados.html
 
 ## Cómo funciona
 
-- Las páginas son estáticas en GitHub Pages. Las preguntas están en `preguntas.js`.
+- Las páginas son estáticas en GitHub Pages. Las preguntas de ambas encuestas están en `preguntas.js` y el formulario en `form.js`.
+- Ambas encuestas comparten la API. Cada una cuenta a sus votantes por una pregunta obligatoria propia, y el voto único es independiente en cada una.
 - Los votos se guardan en una API mínima (`api/server.py`, Python estándar y SQLite) en el VPS, detrás de `https://ai.tunky.net/encuesta-api/`.
 - **Un voto por persona:** cada navegador genera un identificador y la API rechaza un segundo voto con el mismo identificador. Sin inicio de sesión no se puede garantizar al 100%: alguien podría votar de nuevo desde otro navegador o en modo incógnito.
 - **Resultados privados:** `/results` exige la cabecera `X-Admin-Key`. La clave vive en el `.env` del servidor y en `.admin-key` local, que no se sube al repo.

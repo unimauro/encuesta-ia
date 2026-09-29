@@ -5,13 +5,15 @@
 <header><h1>Resultados de la encuesta</h1><p>Solo para el docente. Se actualiza cada 15 segundos.</p></header>
 <form id="login" class="row" style="margin:16px 0"><input type="password" id="k" placeholder="Clave de administrador" autocomplete="current-password"><button>Ver</button></form>
 <p class="err" id="err"></p>
+<div class="row" id="tabs" style="margin:8px 0 0"><button type="button" data-e="inicial">Encuesta inicial</button><button type="button" data-e="cierre">Encuesta de cierre</button></div>
 <div id="out"></div>
 </main>
 <script src="preguntas.js"></script>
 <script>
 const out = document.getElementById("out"), errEl = document.getElementById("err"), kIn = document.getElementById("k");
 let key = ""; try { key = sessionStorage.getItem("ek") || ""; } catch(e){}
-let data = null, timer = null;
+let data = null, timer = null, actual = "inicial";
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => { actual = b.dataset.e; if (data) pintar(); });
 function esc(s){ const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 async function cargar(){
   try {
@@ -22,8 +24,10 @@ async function cargar(){
   } catch(x) { errEl.textContent = "No se pudo conectar con el servidor."; }
 }
 function pintar(){
-  const n = data.votos;
-  let h = `<div class="kpi"><div><b>${n}</b>votos</div><div><b>${data.ultimo ? new Date(data.ultimo*1000).toLocaleTimeString("es-PE") : "–"}</b>último voto</div></div>`;
+  const E = ENCUESTAS[actual], PREGUNTAS = E.preguntas;
+  document.querySelectorAll("#tabs button").forEach(b => b.style.opacity = b.dataset.e === actual ? "1" : ".5");
+  const n = Object.values(data.totales[E.contador] || {}).reduce((a, b) => a + b, 0);
+  let h = `<h2 style="color:var(--navy);margin:20px 0 0">${esc(E.titulo)}</h2><div class="kpi"><div><b>${n}</b>votos</div><div><b>${data.ultimo ? new Date(data.ultimo*1000).toLocaleTimeString("es-PE") : "–"}</b>último voto (cualquier encuesta)</div></div>`;
   h += `<div class="row" style="margin-bottom:8px"><button id="csv" type="button">Descargar CSV</button></div>`;
   for (const p of PREGUNTAS) {
     h += `<fieldset><legend>${esc(p.texto)}</legend>`;
@@ -45,13 +49,14 @@ function pintar(){
   document.getElementById("csv").onclick = csv;
 }
 function csv(){
+  const PREGUNTAS = ENCUESTAS[actual].preguntas;
   const L = [["pregunta","opcion","votos"]];
   for (const p of PREGUNTAS) {
     if (p.tipo === "texto") (data.textos[p.id]||[]).forEach(t => L.push([p.texto, t, ""]));
     else p.opciones.forEach(o => L.push([p.texto, o, (data.totales[p.id]||{})[o]||0]));
   }
   const s = L.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(",")).join("\n");
-  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["﻿"+s], {type:"text/csv"})); a.download = "encuesta-ia.csv"; a.click();
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["﻿"+s], {type:"text/csv"})); a.download = "encuesta-ia-" + actual + ".csv"; a.click();
 }
 document.getElementById("login").addEventListener("submit", e => { e.preventDefault(); key = kIn.value.trim(); cargar(); clearInterval(timer); timer = setInterval(cargar, 15000); });
 if (key) { cargar(); timer = setInterval(cargar, 15000); }
